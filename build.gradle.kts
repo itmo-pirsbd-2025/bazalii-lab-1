@@ -14,16 +14,13 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("org.assertj:assertj-core:3.27.6")
 
     implementation("org.openjdk.jmh:jmh-core:1.37")
     jmh("org.openjdk.jmh:jmh-core:1.37")
     jmhAnnotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:1.37")
-}
 
-sourceSets {
-    named("jmh") {
-        java.srcDir("src/main/java")
-    }
+    implementation("it.unimi.dsi:fastutil:8.5.13")
 }
 
 jmh {

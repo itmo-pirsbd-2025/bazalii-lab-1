@@ -1,8 +1,7 @@
 package com.itmo.sorters;
 
-import com.itmo.IParallelSorter;
+import com.itmo.ParallelSorter;
 
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
@@ -11,95 +10,60 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
-public class NaiveSorter implements IParallelSorter {
+import static com.itmo.sorters.Constants.OversubscriptionRate;
+
+public final class NaiveSorter implements ParallelSorter {
 
     @Override
     public int[] sortArrayAsParallel(int[] array) {
-        if (array == null || array.length == 0) {
+        if (array.length == 0) {
             return new int[0];
         }
 
-        final int cores = Runtime.getRuntime().availableProcessors();
-        final int oversubscriptionRate = 3;
-        int partitionSize = array.length / (cores * oversubscriptionRate);
+        final var cores = Runtime.getRuntime().availableProcessors();
+        var partitionSize = array.length / (cores * OversubscriptionRate);
         if (partitionSize <= 0) {
             partitionSize = 1;
         }
 
         List<int[]> segments = new ArrayList<>();
-        for (int start = 0; start < array.length; start += partitionSize) {
-            int end = Math.min(start + partitionSize, array.length);
-            int[] part = Arrays.copyOfRange(array, start, end);
+        for (var start = 0; start < array.length; start += partitionSize) {
+            var end = Math.min(start + partitionSize, array.length);
+            var part = Arrays.copyOfRange(array, start, end);
             segments.add(part);
         }
 
-        Queue<int[]> queue = new ConcurrentLinkedQueue<>();
+        var queue = segments
+                .parallelStream()
+                .peek(Arrays::sort)
+                .toArray(int[][]::new);
 
-        int sortThreads = Math.min(segments.size(), cores * oversubscriptionRate);
-        ExecutorService sortExecutor = Executors.newFixedThreadPool(sortThreads);
-        for (final int[] part : segments) {
-            sortExecutor.submit(() -> {
-                Arrays.sort(part);
-                queue.add(part);
-            });
-        }
+        while (queue.length > 1) {
+            var pairs = queue.length / 2;
+            var remainder = queue.length % 2;
 
-        sortExecutor.shutdown();
+            var next = new int[pairs + remainder][];
 
-        try {
-            if (!sortExecutor.awaitTermination(100, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("Sorting phase did not finish in time.");
-            }
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted while sorting partitions", ie);
-        }
+            var current = queue;
+            IntStream
+                    .range(0, pairs)
+                    .parallel()
+                    .forEach(i -> next[i] = mergeArrays(current[2 * i], current[2 * i + 1]));
 
-        ExecutorService mergeExecutor = Executors.newFixedThreadPool(sortThreads);
-        AtomicInteger workingMerges = new AtomicInteger(0);
-
-        while (true) {
-            if (queue.size() == 1 && workingMerges.get() == 0) {
-                break;
+            if (remainder == 1) {
+                next[pairs] = current[current.length - 1];
             }
 
-            if (queue.size() >= 2) {
-                final int[] first = queue.poll();
-                final int[] second = queue.poll();
-
-                workingMerges.incrementAndGet();
-                mergeExecutor.submit(() -> {
-                    int[] merged = mergeArrays(first, second);
-                    queue.add(merged);
-                    workingMerges.decrementAndGet();
-                });
-            } else {
-                try {
-                    Thread.sleep(Duration.ofNanos(10));
-                } catch (InterruptedException interruptedException) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
+            queue = next;
         }
 
-        mergeExecutor.shutdown();
-
-        try {
-            if (!mergeExecutor.awaitTermination(100, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("Merge phase did not finish in time.");
-            }
-        } catch (InterruptedException interruptedException) {
-            Thread.currentThread().interrupt();
-        }
-
-        return queue.poll();
+        return queue[0];
     }
 
     private static int[] mergeArrays(int[] firstArray, int[] secondArray) {
-        int[] result = new int[firstArray.length + secondArray.length];
+        var result = new int[firstArray.length + secondArray.length];
         int firstArrayIndex = 0, secondArrayIndex = 0, resultIndex = 0;
         while (firstArrayIndex < firstArray.length || secondArrayIndex < secondArray.length) {
             if (firstArrayIndex == firstArray.length) {

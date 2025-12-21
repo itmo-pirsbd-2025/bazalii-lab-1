@@ -1,47 +1,55 @@
 package com.itmo.sorters;
 
-import com.itmo.IParallelSorter;
+import com.itmo.ParallelSorter;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
-public class CleverSorter implements IParallelSorter {
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrays;
+
+
+import static com.itmo.sorters.Constants.OversubscriptionRate;
+
+public final class CleverSorter implements ParallelSorter {
 
     @Override
     public int[] sortArrayAsParallel(int[] array) {
-        if (array == null || array.length == 0) {
+        if (array.length == 0) {
             return new int[0];
         }
 
-        int maxElement = Arrays.stream(array).max().getAsInt();
-        if (maxElement < 0) {
-            maxElement = 0;
+        var minElement = Integer.MAX_VALUE;
+        var maxElement = Integer.MIN_VALUE;
+        for (var v : array) {
+            if (v < minElement) {
+                minElement = v;
+                continue;
+            }
+
+            if (v > maxElement) {
+                maxElement = v;
+            }
         }
 
-        final int cores = Runtime.getRuntime().availableProcessors();
-        final int oversubscriptionRate = 3;
-        final int expectedNumberOfThreads = cores * oversubscriptionRate;
-        final int numberOfPartitions = expectedNumberOfThreads < array.length ? expectedNumberOfThreads : 1;
-        final int elementsInPartitionRangeSize = maxElement / numberOfPartitions + 1;
+        final var cores = Runtime.getRuntime().availableProcessors();
+        final var expectedNumberOfThreads = cores * OversubscriptionRate;
+        final var numberOfPartitions = expectedNumberOfThreads < array.length ? expectedNumberOfThreads : 1;
+        final var range = (long) maxElement - (long) minElement;
+        final var elementsInPartitionRangeSize = range / numberOfPartitions + 1L;
 
-        List<List<Integer>> partitions = new ArrayList<>(numberOfPartitions);
-        for (int i = 0; i < numberOfPartitions; i++) {
-            partitions.add(new ArrayList<>());
+        List<IntArrayList> partitions = new ArrayList<>(numberOfPartitions);
+        for (var i = 0; i < numberOfPartitions; i++) {
+            partitions.add(new IntArrayList());
         }
 
-        for (int element : array) {
-            var intervalStart = 0;
-            var partitionNumber = 0;
-            while (element < intervalStart || element > intervalStart + elementsInPartitionRangeSize) {
-                intervalStart += elementsInPartitionRangeSize;
-                partitionNumber++;
+        for (var element : array) {
+            var shifted = (long) element - (long) minElement;
+            var partitionNumber = (int) (shifted / elementsInPartitionRangeSize);
+            if (partitionNumber < 0) {
+                partitionNumber = 0;
+            } else if (partitionNumber >= numberOfPartitions) {
+                partitionNumber = numberOfPartitions - 1;
             }
 
             partitions
@@ -49,39 +57,20 @@ public class CleverSorter implements IParallelSorter {
                     .add(element);
         }
 
-        ExecutorService executor = Executors.newFixedThreadPool(numberOfPartitions);
-        List<Future<List<Integer>>> futures = new ArrayList<>(numberOfPartitions);
-        for (final List<Integer> bucket : partitions) {
-            futures.add(executor.submit(() -> {
-                Collections.sort(bucket);
+        partitions
+                .parallelStream()
+                .forEach(bucket -> {
+                    bucket.trim();
+                    IntArrays.quickSort(bucket.elements(), 0, bucket.size());
+                });
 
-                return bucket;
-            }));
-        }
-        executor.shutdown();
+        var result = new int[array.length];
+        var pos = 0;
 
-        List<Integer>[] sortedBuckets = new ArrayList[numberOfPartitions];
-        for (int i = 0; i < futures.size(); i++) {
-            try {
-                var sorted = futures
-                        .get(i)
-                        .get();
-                sortedBuckets[i] = sorted;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("Interrupted while sorting buckets", e);
-            } catch (ExecutionException e) {
-                throw new RuntimeException("Exception while sorting buckets", e.getCause());
-            }
-        }
-
-        int[] result = new int[array.length];
-        int pos = 0;
-        for (List<Integer> sorted : sortedBuckets) {
-            for (Integer currentElement : sorted) {
-                result[pos] = currentElement;
-                pos++;
-            }
+        for (var partition : partitions) {
+            var size = partition.size();
+            System.arraycopy(partition.elements(), 0, result, pos, size);
+            pos += size;
         }
 
         return result;

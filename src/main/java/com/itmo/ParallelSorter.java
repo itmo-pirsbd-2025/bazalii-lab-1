@@ -1,5 +1,5 @@
 package com.itmo;
 
-public interface IParallelSorter {
+public interface ParallelSorter {
     int[] sortArrayAsParallel(int[] array);
 }
