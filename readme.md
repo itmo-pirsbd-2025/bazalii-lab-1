@@ -10,17 +10,17 @@ I've implemented two different algorithms for parallel sorting in ascending orde
 - To run jmh benchmarks use command: `./gradlew jmh`
 
 ## Benchmarks results
-| Benchmark                      | Size    | Mode | Cnt | Score    | Error     | Units |
-|-------------------------------|---------|------|-----|----------|-----------|-------|
-| Benchmarks.builtInSort        | 100     | avgt | 3   | ~1e‑4    |           | ms/op |
-| Benchmarks.builtInSort        | 10000   | avgt | 3   | 0.009    | ±0.001    | ms/op |
-| Benchmarks.builtInSort        | 1000000 | avgt | 3   | 0.938    | ±0.080    | ms/op |
-| Benchmarks.cleverParallelSort | 100     | avgt | 3   | 1.467    | ±5.883    | ms/op |
-| Benchmarks.cleverParallelSort | 10000   | avgt | 3   | 1.626    | ±3.735    | ms/op |
-| Benchmarks.cleverParallelSort | 1000000 | avgt | 3   | 17.467   | ±16.074   | ms/op |
-| Benchmarks.naiveParallelSort  | 100     | avgt | 3   | 2.828    | ±0.680    | ms/op |
-| Benchmarks.naiveParallelSort  | 10000   | avgt | 3   | 2.875    | ±2.390    | ms/op |
-| Benchmarks.naiveParallelSort  | 1000000 | avgt | 3   | 6.845    | ±5.162    | ms/op |
+| Benchmark                      | Size    | Mode | Cnt | Score  | Error  | Units |
+|-------------------------------|---------|------|-----|--------|--------|-------|
+| Benchmarks.builtInSort        | 100     | avgt | 25  | 0.001  | ±0.001 | ms/op |
+| Benchmarks.builtInSort        | 10000   | avgt | 25  | 0.338  | ±0.011 | ms/op |
+| Benchmarks.builtInSort        | 1000000 | avgt | 25  | 57.721 | ±3.599 | ms/op |
+| Benchmarks.cleverParallelSort | 100     | avgt | 25  | 0.009  | ±0.001 | ms/op |
+| Benchmarks.cleverParallelSort | 10000   | avgt | 25  | 0.171  | ±0.005 | ms/op |
+| Benchmarks.cleverParallelSort | 1000000 | avgt | 25  | 15.806 | ±0.542 | ms/op |
+| Benchmarks.naiveParallelSort  | 100     | avgt | 25  | 0.023  | ±0.002 | ms/op |
+| Benchmarks.naiveParallelSort  | 10000   | avgt | 25  | 0.308  | ±0.015 | ms/op |
+| Benchmarks.naiveParallelSort  | 1000000 | avgt | 25  | 21.917 | ±1.941 | ms/op |
 
 Both algorithms are not as effective as the default Java implementation of sorting.
 Naive sort is surprisingly more effective than clever.
